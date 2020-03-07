@@ -1,0 +1,456 @@
+---
+title: "Copula Introduction _ Hyunwoo"
+output: html_notebook
+---
+2017/06/01 
+
+###Roh HyunWoo  
+###ericroh93@gmail.com
+
+This is a copula summary for those who just start learning the concept "copula".
+This note is utterly based on the reference below:
+https://datascienceplus.com/modelling-dependence-with-copulas/  
+http://www.di.fc.ul.pt/~jpn/r/copula/index.html  
+http://eranraviv.com/correlation-and-correlation-structure-2-copulas/  
+http://www.danielberg.no/presentations/astin08.pdf
+http://www.danielberg.no/presentations/Trondheim06.pdf
+http://firsttimeprogrammer.blogspot.kr/2015/02/how-to-fit-copula-model-in-r.html
+
+##Motivation
+- For several applications empirical evidence has proved multinormal distribution inadequate for serveral reasons
+- Most traditional representations of dependence are based on the linear correlation coefficient - restricted to multivariate elliptical distributions. e.g. pearson correlation coefficient based on the multi-normal assumption is also very limited. Copula representations of dependence are free of such limitations.
+- Financial markets we often see non-linear dependency structures
+- Empirical marginal distributions are e.g. skewed and heavy-tailed. Mostly found in financial data
+- Possibilities of extreme co-movements, in contrast to the multinormal distribution
+
+##Attractive features
+- Without the limitation of marginal distribution selection, it is possible to construct much more flexible multivariate distribution. A copula describes how the marginals are tied together in the joint distribution
+- Possible to separately study random variable's marginal distributions and correlation structure. For some combination of marginals there are no built-in functions to generate the desired multivariate distribution. For instance, in R it is easy to generate random samples from a multivariate normal distribution, however it is not so easy to do the same with say a distribution whose margins are Beta, Gamma and STudent, respectively.
+- A copula is invariant under strictly increasing transformations / If doing nonlinear monotone increasing transformation to variables, the values of linear dependent coefficients will change, but the consistency and correlation measurements derived from Copula function will not change so that it can catch variables' nonlinear and dissymmetrical correlations.
+- Most traditional measures of dependence are measures of pairwise dependence. Copulas measure the dependence between all random variables.
+
+## Dependence Concepts (Linear Correlation)
+There are few more such as Concordance(Kendall's tau and Spearman's rho) and Tail dependence.
+
+### Linear Correlation
+- Sensitive to outliers
+- Measure the "average dependence" between X and Y
+- Invariant under only strictly increasing linear transformations
+- May be misleading in situations where multivariate df is not elliptical
+
+In all cases, linear correlation is around 0.7  
+- Gumbel copula: theta = 2.0  
+- Clayton copula: theta = 2.2  
+- t copula: v = 4, p = 0.71  
+
+##All four distributions below have linear correlation equal to 0.7
+```{r}
+set.seed(100)
+U1 = normalCopula(0.7,dim=2)
+x <- qnorm(rCopula(500, U1))
+U2 = claytonCopula(2.2, dim=2)
+y <- qnorm(rCopula(500,U2))
+U3 <- gumbelCopula(2.0, dim=2)
+z = qnorm(rCopula(500,U3))
+U4 <- tCopula(0.71,df=4,dim=2)
+t = qnorm(rCopula(500,U4))
+par(mfrow=c(2,2))
+plot(x[,1],x[,2])
+plot(y[,1],y[,2])
+plot(z[,1],z[,2])
+plot(t[,1],t[,2])
+par(mfrow=c(1,1))
+```
+
+[Illustration of the potential pitfalls of the linear correaltion coefficient.]
+
+## Overview
+
+RV°¡ normalÀÌ ¾Æ´Ñ È¤Àº ¼­·Î ´Ù¸¥ ºÐÆ÷¸¦ µû¸¦¶§, ¿¹¸¦µé¾î tºÐÆ÷¿Í log-normalºÐÆ÷¸¦ µû¸¦ ¶§´Â °è»êµÈ Pearson »ó°ü°è¼öÀÇ °ªÀº ±× ÀÇ¹Ì¸¦ »ó½ÇÇÏ°Ô µÈ´Ù. ÀÌ·¯ÇÑ °æ¿ì ´Ù¸¥ Marginal dist¸¦ °¡Áö´Â RVµéÀÇ °áÇÕºÐÆ÷¸¦ ±¸ÇØ³»´Â °ÍÀÌ ¸ñÀûÀÎ ¡®ÄÚÇÃ¶ó¡¯ ¶ó´Â ÇÔ¼ö¸¦ »ç¿ëÇÒ ¼ö ÀÖ´Ù. ´ë½Å ±× °áÇÕºÐÆ÷¿¡ ´ëÇØ¼­´Â °¡¿ì½Ã¾È(=¾Æ¸£Å°¹Ìµð¾È), ±Àº§, t µî ¾î¶² ºÐÆ÷¸¦ µû¸¦ °ÍÀÎÁö °¡Á¤À» ÇØÁÖ¾î¾ß ÇÏ¸ç ±× °¢°¢ÀÇ ºÐÆ÷¿¡ ¸Â´Â ÄÚÇ®¶ó ÇÔ¼ö°¡ Àû¿ëµÇ¾î ±× ÇÔ¼ö½ÄÀÇ parameter¸¦ ¼öÄ¡ÇØ¼®ÀûÀ¸·Î ÃßÁ¤ÇÏ°Ô µÈ´Ù. 
+
+Joint DistributionÀÌ ¿Ö Áß¿äÇÏ³Ä¸é, Joint distribution ¾È¿¡´Â dependence
+structure Á¤º¸ »Ó¸¸ ¾Æ´Ï¶ó °¢ º¯¼öµéÀÇ individual behavior ¶ó ÇÒ ¼ö ÀÖ´Â marginal distributionÀÌ ÁÖ´Â Á¤º¸µéÀÌ ÀüºÎ´Ù µé¾îÀÖ±â ¶§¹®ÀÌ´Ù. ÄÚÇÃ¶ó´Â Joint distribution¿¡¼­ °¢°¢ÀÇ marginal ÀÌ ÁÖ´Â Á¤º¸¸¦ Á¦¿ÜÇÑ ³ª¸ÓÁö¶ó°í ÀÌÇØÇÒ ¼ö ÀÖ´Ù. ´Ù½Ã¸»ÇØ¼­ Joint distributionÀ» Marginal distribution°ú ÄÚÇ®¶ó·Î ±¸ÇØÁö´Â dependence structure·Î ³ª´­ ¼ö ÀÖ´Ù. µû¶ó¼­ dependence structure¸¦ ´Ù¸£°Ô ¸ðµ¨¸µ ÇÏ¸é °°Àº marginal distributionÀ» »ç¿ëÇÏ´õ¶óµµ
+±×°ÍµéÀÇ Joint distributionÀÌ ´Ù¸£°Ô ³ª¿Â´Ù. ¸¶Âù°¡Áö·Î °°Àº dependence 
+structure¸¦ °¡Áö´õ¶óµµ marginal distributionÀÌ ´Ù¸£¸é ´Ù¸¥ joint 
+distributionÀÌ ³ª¿Â´Ù. 
+
+¿¹¸¦µé¾î pair of random variable X, Y¸¦ »ý°¢ÇØº¸ÀÚ. ±×¸®°í X,Y °¢°¢ÀÇ ´©Àû ºÐÆ÷ÇÔ¼öÀÎ CDF¸¦ F, G¶ó ÇÏ°í °áÇÕ ´©ÀûºÐÆ÷(Joint cdf)´Â H¶ó°í ÇÏÀÚ. ¶ÇÇÑ X,YÀÇ È®·ü ¹ÐµµÇÔ¼ö(pdf)´Â f,g¶ó ÇÏ°í °áÇÕÈ®·ü¹Ðµµ ÇÔ¼ö´Â h¶ó ÇÏÀÚ. ±×·¯¸é ´ÙÀ½ÀÇ ½Ä¿¡ ÀÇÇØ¼­ joint distribution h ´Â °¢°¢ÀÇ marginalÀÇ ¹ÐµµÇÔ¼öÀÇ °ö(product)°ú ÀûÀýÇÑ ÄÚÇÃ¶ó density·Î decomposeÇÒ ¼ö ÀÖ´Ù. 
+
+h(x,y) = c(F(x),G(y))f(x)g(y)
+<=> c(F(x),G(y)) = h(x,y) / f(x)g(y)
+
+¿©±â¼­ c´Â ÄÚÇÃ¶ó ¹Ðµµ ÇÔ¼ö¸¦ ÀÇ¹ÌÇÑ´Ù. À§ ½ÄÀ» ÅëÇØ¼­ ¾Ë¼öÀÖ´Â °ÍÀº µÎ°³ÀÇ RV°¡ µ¶¸³ÀÏ¶§´Â c(F(x),G(y)) ´Â 1ÀÌ°í °áÇÕ¹ÐµµÇÔ¼ö´Â °¢°¢ÀÇ È®·ü¹ÐµµÇÔ¼öÀÇ °öÀ¸·Î ³ªÅ¸³¾ ¼ö ÀÖ°Ô µÈ´Ù. ¸¸¾à¿¡ µÎ°³ÀÇ RV°¡ °°ÀÌ ¿òÁ÷(co-vary)ÀÌ¸é h(x,y)°¡ ´Ü¼ø °ö f(x)g(y)º¸´Ù Ä¿Á®¼­ c(F(x),G(y))°¡ 1º¸´Ù Ä¿Áö°Ô µÇ°í ¹Ý´ë·Î RV°¡ ¹Ý´ë·Î ¿òÁ÷ÀÌ¸é copula density°¡ 1º¸´Ù ÀÛ¾ÆÁö°Ô µÈ´Ù. That is, the copula pdf is the ratio of the joint pdf to what it would have been under independence. So we can also interpret the copula as the adjustment that we need to make to convert the independence pdf into the joint pdf.
+
+```{r}
+cop2 <- normalCopula(param=c(0.7), dim=2, dispstr="un") # 2D copula to plot
+par(mfrow=c(1,2))
+persp(cop2, dCopula, main="Density", xlab="u1", ylab="u2", theta=35)
+persp(cop2, pCopula, main="CDF",     xlab="u1", ylab="u2", theta=35)
+par(mfrow=c(1,1))
+```
+
+```{r}
+ind.cop <- indepCopula(dim = 2)
+par(mfrow=c(1,2))
+persp(ind.cop, dCopula, main="Density", xlab="u1", ylab="u2", theta=35)
+persp(ind.cop, pCopula, main="CDF",     xlab="u1", ylab="u2", theta=35)
+```
+
+
+## Introduction
+
+We generate n samples from a multivariate normal distribution of 3 random variables given the covariance matrix sigma using the MASS package.
+
+```{r}
+#install.packages("MASS")
+library(MASS)  # use: mvrnorm
+set.seed(100)
+
+m <- 3
+n <- 2000
+sigma <- matrix(c(1, 0.5, 0.2,
+                  0.5, 1, -0.7,
+                  0.2, -0.7, 1), 
+                nrow=3)
+x <- mvrnorm(n,mu=rep(0, m),Sigma=sigma,empirical=T)
+colnames(x) <- paste0("x", 1:m)
+cor(x,method='spearman') # check sample correlation
+```
+Function mvrnorm is nice to generate correlated random variables but there is a restriction, the marginal functions are normal distributions as we can see below
+
+Now we check the samples correaltion using cor() and pairplot
+
+We are going to set method='spearman' in order to use Spearman¡¯s Rho instead of the 'pearson' method in the cor() function (this is not strictly necessary in our example since we are going to use an elliptical copula, if you use non-elliptical copulas you may want to use either Spearman¡¯s Rho or Kendall¡¯s Tau).
+
+```{r}
+#install.packages("psych")
+library(psych) # use: pairs.panels
+pairs.panels(x)
+```
+
+<center> <h2> What if we have non-normal marginals? </h2> </center>  
+
+Many empirical evidence have skewed or heavy tailed marginals. What if we would like to create a similar correlated random variables but with arbitrary marginals, say, a Gamma(2,1), a Beta(2,2), and a t(¥í¥í=5) distribution?
+
+####Here¡¯s a possible algorithm to do that:
+
+####1. Generate the variables x~i~ from a Gaussian multivariate (as we did)
+
+####2. Remembering the probability integral transformation: 
+Transforms a set of dependent variables into a new set of
+independent U(0, 1) variables, given the multivariate distribution.
+
+<center> <h3>
+X¡­F~X~¢¡U=F~X~(X)¡­U(0,1)
+</h3> </center>  
+
+transform x~i~ using the Gaussian cdf, ¥Õ (in R is called pnorm), ui=¥Õ(xi), where u~i~ have marginal uniform distributions but are still correlated as variables x~i~.
+
+####3. Apply, for each variable uiui, the inverse cdf of the required distribution that we wish as the marginal (eg, in R, the inverse of  pnorm is qnorm), that is z~i~ = F^-1^(u~i~)
+
+now comes the magic trick: recall that if X is a random variable with distribution F then F(X) is uniformly distributed in the interval [0, 1]. In our toy example we already know the distribution FF for each of the three random variables so this part is quick and straightforward.
+
+```{r}
+u <- pnorm(x)
+pairs.panels(u)
+```
+
+### Important Fact
+
+"CDF·Î transformation (PIT)À» ÇÏ¸é ±âÁ¸ marginalÀÇ Á¤º¸´Â »ç¶óÁö°í dependence¿¡ ´ëÇÑ Á¤º¸¸¸ ³²°ÔµÈ´Ù."
+
+Note that each distribution is uniform in the [0,1] interval. Note also that the correlation the same, in fact, the transformation we applied did not change the correlation structure between the random variables. Basically we are left only with what is often referred as the dependence structure.
+
+
+
+### 3D of vector u
+
+By using the rgl library we can plot a nice 3D representation of the vector u. This is very nice for presentation purposes, you can easily rotate around the graph in case you would like to check a different perspective: go nuts! Just click on the picture and drag the mouse around.
+
+```{r}
+library(rgl)
+plot3d(u[,1],u[,2],u[,3],pch=20,col='navyblue')
+```
+
+Let's do the 3rd step, which is to apply the inverse cdf of required distribution that we wish as the marginal.
+
+```{r}
+z1 <- qgamma(u[,1], shape=2,  scale=1)
+z2 <-  qbeta(u[,2], shape1=2, shape2=2)
+z3 <-     qt(u[,3], df=5)
+z  <- cbind(z1,z2,z3)
+cor(z, meth='spearman')
+```
+```{r}
+pairs.panels(z)
+```
+
+And now we got the targeted margins with distribution that we wanted. What is worth noticing is that by starting from a multivariate normal sample we have build a sample with the desired and fixed dependence structure and, basically, arbitrary marginals.  I would like to emphasize that I chose totally arbitrary marginals. I could have chosen any marginal as long as it was a continuous function.
+
+## Using copula package
+Let's replicate the process above using copulas
+```{r}
+library(copula)
+set.seed(100)
+# constructs an elliptical copula
+myCop <- normalCopula(param=c(0.5,0.2,-0.7), dim=3, dispstr="un")
+# creates a multivariate distribution via copula
+myMvd <- mvdc(copula=myCop, margins=c("gamma", "beta", "t"),
+              paramMargins=list(list(shape=2,  scale=1),
+                                list(shape1=2, shape2=2), 
+                                list(df=5)) )
+```
+
+Now that we have specified the dependence structure through the copula (a normal copula) and set the marginals, the mvdc() function generates the desired distribution.  
+Then we can generate random samples using the rmvdc() function.
+
+
+```{r}
+z2 <- rMvdc(n, myMvd)
+colnames(z2) <- paste0("z",1:m)
+pairs.panels(z2)
+```
+
+
+
+#### Construction of Copula Model
+
+1) Determine marginal distribution
+2) Define an appropriate Copula function so as to well describe marginal distribution's dependent structure.  
+
+There are two key quetions when building multivariate financial time series Copula model, which are univariate financial time series distribution model's establishment and Copula function's determination.
+
+####Marginal distribution of Financial Time series
+
+1) ARCH/GARCH(Autoregressive conditional heteroscedasticity)
+2) SV(stochastic volatility)
+As is known to all,financial time series¡¯ conditional distribution presents lots of features such as time varying volatility, volatility clustering, skewness, kurtosis, fat tail, etc. ARCH and SV both can suitably portray financial time series¡¯ characters and marginal distribution.
+
+#### Common Binary Copula Function
+
+Copula is accumulated distribution function making random
+variables¡¯ marginal distributions connecting each other. Comparing with linearly dependent coefficient, the consistency and relational measurement derived from Copula function can catch variables¡¯ nonlinear correlation. And different from other joint distribution modeling methods, Copula model is much more flexible and does not limit the choice of marginal distribution. Because, when the assumptions of binary or multivariate normal distribution
+are rejected, Copula provides different kinds of marginal distributions and functions to replace the former one so as to achieve best fitting results. Moreover, Copula model can get the parameters of correlation measurements and specific functions by organically combining random variables¡¯ dependent degrees and patterns.
+
+1) Normal Copula
+2) Gumbel Copula
+3) Clayton Copula
+4) Frank Copula  
+......
+
+## A simple example of application  
+Now for the real world example,   
+
+We are going to fit a copula to the returns of two stocks and try to simulate the returns using the copula.
+From the reference website, they provide cleaned return data from two stocks. You can download it from below website.
+http://datascienceplus.com/wp-content/uploads/2015/10/yahoo_r.csv
+http://datascienceplus.com/wp-content/uploads/2015/10/cree_r.csv
+
+## Let's load the returns in R
+
+```{r}
+cree <- read.csv('cree_r.csv',header=F)$V2
+yahoo <- read.csv('yahoo_r.csv',header=F)$V2
+```
+
+Before going straight to the copula fitting process, let¡¯s check the correlation between the two stock returns and plot the regression line:
+```{r}
+plot(cree,yahoo,pch='.')
+abline(lm(yahoo~cree),col='red',lwd=1)
+cor(cree,yahoo,method='spearman')
+```
+
+In the first example above I chose a normal copula model without much thinking, however, when applying these models to real data one should carefully think at what could suit the data better. For instance, many copulas are better suited for modelling asymetrical correlation other emphasize tail correlation a lot, and so on. My guess for stock returns is that a t-copula should be fine, however a guess is certainly not enough. Fortunately, the VineCopula package offers a great function which tells us what copula we should use. Essentially the VineCopula library allows us to perform copula selection using BIC and AIC through the function BiCopSelect()
+
+```{r}
+library(VineCopula)
+u <- pobs(as.matrix(cbind(cree,yahoo)))[,1]
+v <- pobs(as.matrix(cbind(cree,yahoo)))[,2]
+selectedCopula <- BiCopSelect(u,v,familyset=NA)
+selectedCopula
+```
+
+Note that I fed into the selection algorithm the pseudo observations using the pobs() function. Pseudo observations are the observations in the [0,1] interval.
+The fitting algorithm indeed selected a t-copula (encoded as 2 in the $family reference) and estimated the parameters for us. By typing ?BiCopSelect() you can actually see the encoding for each copula.  
+
+Let¡¯s try to fit the suggested model using the copula package and double check the parameters fitting.
+
+```{r}
+t.cop <- tCopula(dim=2)
+set.seed(500)
+m <- pobs(as.matrix(cbind(cree,yahoo)))
+fit <- fitCopula(t.cop,m,method='ml')
+coef(fit)
+```
+
+It is nice to see that the parameters of the fitted copula are the same as those suggested by the BiCopSelect() function. Let¡¯s take a look at the density of the copula we have just estimated
+
+```{r}
+rho <- coef(fit)[1]
+df <- coef(fit)[2]
+persp(tCopula(dim=2,rho,df=df),dCopula)
+```
+Now we only need to build the copula and sample from it 3965 random samples.
+This is the plot of the samples contained in the vector u
+```{r}
+u <- rCopula(3965,tCopula(dim=2,rho,df=df))
+plot(u[,1],u[,2],pch='.',col='blue')
+cor(u,method='spearman')
+```
+
+The random samples from the copula look a little bit close to the independence case, but that is fine since the correlation between the returns is low. Note that the generated samples have the same correlation as the data.
+The t-copula emphasizes extreme results: it is usually good for modelling phenomena where there is high correlation in the extreme values (the tails of the distribution).
+Note also that it is symmetrical, this might be an issue for our application, however we are going to neglect this.
+Now we are facing the hard bit: modelling the marginals. We are going to assume normally distributed returns for simplicity even though it is well known to be a far from sound assumption. We therefore estimate the parameters of the marginals
+
+```{r}
+cree_mu <- mean(cree)
+cree_sd <- sd(cree)
+yahoo_mu <- mean(yahoo)
+yahoo_sd <- sd(yahoo)
+```
+
+Let¡¯s plot the fittings against the histogram in order to gather a visual take on what we are doing:
+
+```{r}
+hist(cree,breaks=80,main='Cree returns',freq=F,density=30,col='cyan',ylim=c(0,20),xlim=c(-0.2,0.3))
+lines(seq(-0.5,0.5,0.01),dnorm(seq(-0.5,0.5,0.01),cree_mu,cree_sd),col='red',lwd=2)
+legend('topright',c('Fitted normal'),col=c('red'),lwd=2)
+hist(yahoo,breaks=80,main='Yahoo returns',density=30,col='cyan',freq=F,ylim=c(0,20),xlim=c(-0.2,0.2))
+lines(seq(-0.5,0.5,0.01),dnorm(seq(-0.5,0.5,0.01),yahoo_mu,yahoo_sd),col='red',lwd=2)
+legend('topright',c('Fitted normal'),col=c('red'),lwd=2)
+```
+
+Optionally at the beginning we could have plot the data with the distribution for each random variable as below
+
+```{r}
+# Plot data with histograms
+xhist <- hist(cree, breaks=80, plot=FALSE)
+yhist <- hist(yahoo, breaks=80, plot=FALSE) 
+top <- max(c(xhist$counts, yhist$counts)) 
+xrange <- c(-0.15,0.15)
+yrange <- c(-0.15,0.15)
+nf <- layout(matrix(c(2,0,1,3),2,2,byrow=TRUE), c(3,1), c(1,3), TRUE) 
+par(mar=c(3,3,1,1)) 
+plot(cree,yahoo, xlim=xrange, ylim=yrange, xlab="", ylab="") 
+par(mar=c(0,3,1,1)) 
+barplot(xhist$counts, axes=FALSE, ylim=c(0, top), space=0) 
+par(mar=c(3,0,1,1)) 
+barplot(yhist$counts, axes=FALSE, xlim=c(0, top), space=0, horiz=TRUE)
+```
+
+Do not let the nice graphs fool you, under the assumptions for the distributions of the returns we are neglecting some extreme returns located in the tails of the distribution, but in this example we are interested in the joint behaviour, so that is what we are going to analyse soon.
+
+Now we apply the copula in the mvdc() function and then use rmvdc() to get our simulated observations from the generated multivariate distribution. Finally, we compare the simulated results with the original data.
+
+```{r}
+copula_dist <- mvdc(copula=tCopula(rho,dim=2,df=df), margins=c("norm","norm"),
+                    paramMargins=list(list(mean=cree_mu, sd=cree_sd),
+                                      list(mean=yahoo_mu, sd=yahoo_sd)))
+sim <- rMvdc(3965, copula_dist)
+```
+
+Good, now we have simulated data, let¡¯s make a visual comparison
+
+```{r}
+plot(cree,yahoo,main='Returns')
+points(sim[,1],sim[,2],col='red')
+legend('bottomright',c('Observed','Simulated'),col=c('black','red'),pch=21)
+```
+This is the final scatterplot of the data under the assumption of normal marginals
+and t-copula for the dependence structure:
+
+As you can see, the t-copula leads to results close to the real observations, although there are fewer extreme returns than in the real data and we missed some of the most extreme result. If we were interested in modelling the risk associated with these stocks then this would be a major red flag to be addressed with further model calibration.
+
+Since the purpose of this example is simply to show how to fit a copula and generate random observations using real data, weare going to stop here.
+
+## Simulating with different parameters
+
+Just as a curiosity let me show you how the simulated values from the copula would have changed by tweaking the df parameter in the t-copula.
+Let¡¯s try df=1 and df=8
+
+```{r}
+set.seed(4258)
+copula_dist <- mvdc(copula=tCopula(rho,dim=2,df=1), margins=c("norm","norm"),
+                    paramMargins=list(list(mean=cree_mu, sd=cree_sd),
+                                      list(mean=yahoo_mu, sd=yahoo_sd)))
+sim <- rMvdc(3965,copula_dist)
+plot(cree,yahoo,main='Returns')
+points(sim[,1],sim[,2],col='red')
+legend('bottomright',c('Observed','Simulated df=1'),col=c('black','red'),pch=21)
+cor(sim[,1],sim[,2],method='spearman')
+
+copula_dist <- mvdc(copula=tCopula(rho,dim=2,df=8), margins=c("norm","norm"),
+                    paramMargins=list(list(mean=cree_mu, sd=cree_sd),
+                                      list(mean=yahoo_mu, sd=yahoo_sd)))
+sim <- rMvdc(3965,copula_dist)
+plot(cree,yahoo,main='Returns')
+points(sim[,1],sim[,2],col='red')
+legend('bottomright',c('Observed','Simulated df=8'),col=c('black','red'),pch=21)
+cor(sim[,1],sim[,2],method='spearman')
+```
+
+Note how different are the dependence structures that we have obtained although Spearman¡¯s Rho is similar.
+Clearly the parameter df is very important in determining the shape of the distribution. As df increases, the t-copula tends to a gaussian copula.
+
+## Few more examples
+
+The dataset
+For the purpose of this example I used a simple dataset of returns for stock x and y (x.txt and y.txt). You can download the dataset by clicking here.
+https://www.dropbox.com/s/unxj0wgd7t2b0cc/dataset.zip?dl=0
+
+First of all we need to load the data and convert it into a matrix format. Optionally one can plot the data. Remember to load the copula package with 
+
+```{r}
+x <- read.table("C:\\x.txt")
+y <- read.table("C:\\y.txt")
+
+mat <- matrix(nrow=100,ncol=2)
+
+for(i in 1:100)
+{
+    mat[i,1] <- x[,1][i]
+    mat[i,2] <- y[,1][i]
+}
+
+# Actual observations
+plot(mat[,1],mat[,2],main="Returns",xlab="x",ylab="y",col="blue")
+```
+
+Now we have our data loaded, we can clearly see that there is some kind of positive correlation.
+
+The next step is the fitting. In order to fit the data we need to choose a copula model. The model should be chose based on the structure of data and other factors. As a first approximation, we may say that our data shows a mild positive correlation therefore a copula which can replicate such mild correlation should be fine. Be aware that you can easily mess up with copula models and this visual approach is not always the best option. Anyway I choose to use a normal copula from the package. The fitting process anyway is identical for the other types of copula.
+
+Let¡¯s fit the data
+
+```{r}
+# Normal copula
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat),method="ml")
+
+# Coefficients
+rho <- coef(fit.cop)
+print(rho)
+```
+Note that the data must be fed through the function pobs() which converts the real observations into pseudo observations into the unit square [0,1].
+Note also that we are using the ¡°ml¡± method (maximum likelihood method) however other methods are available such as ¡°itau¡±.
+
+The parameter of the fitted copula, rho, in our case is equal to 0.7387409. Let¡¯s
+simulate some pseudo observations
+
+By plotting the pseudo and simulated observations we can see how the simulation with
+the copula matches the pseudo observations
+
+```{r}
+# Pseudo observations
+p_obs <- pobs(mat)
+plot(p_obs, col="blue")
+plot(p_obs[,1],p_obs[,2],main="Pseudo/simulated observations: BLUE/RED",xlab="u",ylab="v",col="blue")
+
+# Simulate data
+set.seed(100)
+u1 = rCopula(500,normalCopula(coef(fit.cop),dim=2))
+points(u1[,1],u1[,2],col="red")
+```
+
+
